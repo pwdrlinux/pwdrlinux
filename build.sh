@@ -24,11 +24,34 @@ pwdr_iso="$build_dir/pwdr.iso"
 linux_repo="https://github.com/torvalds/linux"
 busybox_repo="https://github.com/pwdrlinux/busybox"
 
+mkdir -p "$thirdparty_dir" "$build_dir"
+
 if [[ ! -v MAKEFLAGS ]]; then
     export MAKEFLAGS="-j$(nproc)"
 fi
 
-mkdir -p "$thirdparty_dir" "$build_dir"
+_error() {
+    echo "error: $@" >&2
+}
+
+_fatal() {
+    _error "$@"
+    exit 1
+}
+
+_has_cmd() {
+    command -v "$@" > /dev/null
+}
+
+_require_cmd() {
+    for cmd in "$@"; do
+        if ! _has_cmd "$cmd"; then
+            _fatal "$cmd: not found"
+        fi
+    done
+}
+
+_require_cmd git make cc cpio gzip grub-mkrescue
 
 _clone_if_needed() {
     local repo="$1"
@@ -42,6 +65,8 @@ _clone_if_needed() {
 }
 
 _build_linux() (
+    echo "building kernel..."
+
     _clone_if_needed "$linux_repo" "$linux_version" "$linux_dir"
     cd "$linux_dir"
 
@@ -50,6 +75,8 @@ _build_linux() (
 )
 
 _build_busybox() (
+    echo "building busybox..."
+
     _clone_if_needed "$busybox_repo" "$busybox_version" "$busybox_dir"
     cd "$busybox_dir"
 
@@ -60,10 +87,12 @@ _build_busybox() (
 )
 
 _create_rootfs() (
+    echo "creating rootfs..."
+
     mkdir -p "$rootfs_dir"
 
     cp -a "$busybox_dir"/_install/* "$rootfs_dir"
-    cp src/init "$rootfs_dir"
+    cp "$src_dir/init" "$rootfs_dir/init"
 
     cd "$rootfs_dir"
 
@@ -73,6 +102,7 @@ _create_rootfs() (
 
 _create_img() {
     _create_rootfs
+    echo "creating img..."
 
     cd "$rootfs_dir"
     find . | cpio -ov -H newc > "$pwdr_cpio"
@@ -82,6 +112,7 @@ _create_img() {
 
 _create_iso() {
     _create_img
+    echo "creating iso..."
 
     mkdir -p "$iso_dir/boot/grub"
 
@@ -93,4 +124,5 @@ _create_iso() {
 
 _build_linux
 _build_busybox
+
 _create_iso
