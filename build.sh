@@ -140,7 +140,6 @@ _build_initramfs_rootfs() (
     cd "$build_initramfs_dir"
     cp -a "$initramfs_dir"/. .
 
-    chmod +x init
     mkdir -p dev proc sbin sys usr/bin usr/sbin
 )
 

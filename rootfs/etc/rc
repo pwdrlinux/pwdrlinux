@@ -1,0 +1,9 @@
+#!/bin/sh
+
+mkdir -p /proc /sys /dev
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+
+exec runsvdir -P /var/service
