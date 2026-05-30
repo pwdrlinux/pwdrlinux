@@ -7,7 +7,9 @@ busybox_version="1_37_1"
 
 root="$PWD"
 configs_dir="$root/configs"
+
 initramfs_dir="$root/initramfs"
+rootfs_dir="$root/rootfs"
 
 thirdparty_dir="$root/thirdparty"
 build_dir="$root/build"
@@ -112,21 +114,31 @@ _build_rootfs_busybox() (
     make CONFIG_PREFIX="$build_rootfs_dir" install
 )
 
+_build_rootfs() (
+    rm -rf "$build_rootfs_dir"
+    mkdir -p "$build_rootfs_dir"
+
+    _build_rootfs_busybox
+    cd "$build_rootfs_dir"
+
+    cp -a "$rootfs_dir"/. .
+    mkdir -p home root
+)
+
 _build_initramfs_rootfs() (
     echo "initramfs: creating rootfs..."
 
-    rm -rf "$build_initramfs_dir" "$build_rootfs_dir"
-    mkdir -p "$build_initramfs_dir" "$build_rootfs_dir"
-
-    cp -a "$initramfs_dir"/. "$build_initramfs_dir"
+    rm -rf "$build_initramfs_dir"
+    mkdir -p "$build_initramfs_dir"
 
     _build_initramfs_busybox
-    _build_rootfs_busybox
+    _build_rootfs
 
     mksquashfs "$build_rootfs_dir" "$build_initramfs_dir/rootfs.squashfs" \
         -comp zstd
 
     cd "$build_initramfs_dir"
+    cp -a "$initramfs_dir"/. .
 
     chmod +x init
     mkdir -p dev proc sbin sys usr/bin usr/sbin
