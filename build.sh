@@ -5,11 +5,12 @@ set -euo pipefail
 linux_version="v7.0"
 busybox_version="1_37_1"
 
-root_dir="$PWD"
-src_dir="$root_dir/src"
+root="$PWD"
+configs_dir="$root/configs"
+initramfs_dir="$root/initramfs"
 
-thirdparty_dir="$root_dir/thirdparty"
-build_dir="$root_dir/build"
+thirdparty_dir="$root/thirdparty"
+build_dir="$root/build"
 
 linux_dir="$thirdparty_dir/linux-$linux_version"
 busybox_dir="$thirdparty_dir/busybox-$busybox_version"
@@ -74,25 +75,27 @@ _build_linux() (
     make
 )
 
-_build_busybox() (
-    echo "building busybox..."
+_build_initramfs_busybox() (
+    echo "initramfs: building busybox..."
 
     _clone_if_needed "$busybox_repo" "$busybox_version" "$busybox_dir"
     cd "$busybox_dir"
 
-    cp "$src_dir/busybox.config" .config
+    cp "$configs_dir/initramfs/busybox.config" .config
     make oldconfig
 
-    make install
+    make CONFIG_PREFIX="$rootfs_dir" install
 )
 
-_create_rootfs() (
-    echo "creating rootfs..."
+_build_initramfs_rootfs() (
+    echo "initramfs: creating rootfs..."
 
+    rm -rf "$rootfs_dir"
     mkdir -p "$rootfs_dir"
 
-    cp -a "$busybox_dir"/_install/* "$rootfs_dir"
-    cp "$src_dir/init" "$rootfs_dir/init"
+    cp -a "$initramfs_dir"/* "$rootfs_dir"
+
+    _build_initramfs_busybox
 
     cd "$rootfs_dir"
 
@@ -100,8 +103,8 @@ _create_rootfs() (
     mkdir -p dev proc sbin sys usr/bin usr/sbin
 )
 
-_create_img() {
-    _create_rootfs
+_build_img() {
+    _build_initramfs_rootfs
     echo "creating img..."
 
     cd "$rootfs_dir"
@@ -110,19 +113,19 @@ _create_img() {
     gzip -9c "$pwdr_cpio" > "$pwdr_img"
 }
 
-_create_iso() {
-    _create_img
-    echo "creating iso..."
+_build_iso() {
+    _build_img
 
+    rm -rf "$iso_dir"
     mkdir -p "$iso_dir/boot/grub"
 
-    cp "$linux_dir/arch/x86_64/boot/bzImage" "$pwdr_img" "$iso_dir/boot"
-    cp "$src_dir/grub.cfg" "$iso_dir/boot/grub"
+    cp "$configs_dir/grub.cfg" "$iso_dir/boot/grub"
 
+    _build_linux
+    cp "$linux_dir/arch/x86_64/boot/bzImage" "$pwdr_img" "$iso_dir/boot"
+
+    echo "creating iso..."
     grub-mkrescue -o "$pwdr_iso" "$iso_dir"
 }
 
-_build_linux
-_build_busybox
-
-_create_iso
+_build_iso
