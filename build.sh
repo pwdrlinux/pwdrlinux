@@ -15,8 +15,9 @@ build_dir="$root/build"
 linux_dir="$thirdparty_dir/linux-$linux_version"
 busybox_dir="$thirdparty_dir/busybox-$busybox_version"
 
-rootfs_dir="$build_dir/rootfs"
-iso_dir="$build_dir/iso"
+build_initramfs_dir="$build_dir/initramfs"
+build_rootfs_dir="$build_dir/rootfs"
+build_iso_dir="$build_dir/iso"
 
 pwdr_cpio="$build_dir/pwdr.cpio"
 pwdr_img="$build_dir/pwdr.img"
@@ -29,6 +30,10 @@ mkdir -p "$thirdparty_dir" "$build_dir"
 
 if [[ ! -v MAKEFLAGS ]]; then
     export MAKEFLAGS="-j$(nproc)"
+fi
+
+if [[ ! -v CFLAGS ]]; then
+    export CFLAGS="-Oz"
 fi
 
 _error() {
@@ -52,7 +57,7 @@ _require_cmd() {
     done
 }
 
-_require_cmd git make cc cpio gzip grub-mkrescue
+_require_cmd git make cc cpio zstd grub-mkrescue mksquashfs
 
 _clone_if_needed() {
     local repo="$1"
@@ -71,7 +76,9 @@ _build_linux() (
     _clone_if_needed "$linux_repo" "$linux_version" "$linux_dir"
     cd "$linux_dir"
 
-    make defconfig
+    cp "$configs_dir/linux.config" .config
+    make olddefconfig
+
     make
 )
 
@@ -81,23 +88,45 @@ _build_initramfs_busybox() (
     _clone_if_needed "$busybox_repo" "$busybox_version" "$busybox_dir"
     cd "$busybox_dir"
 
+    make distclean
+
     cp "$configs_dir/initramfs/busybox.config" .config
     make oldconfig
 
-    make CONFIG_PREFIX="$rootfs_dir" install
+    make
+    make CONFIG_PREFIX="$build_initramfs_dir" install
+)
+
+_build_rootfs_busybox() (
+    echo "rootfs: building busybox..."
+
+    _clone_if_needed "$busybox_repo" "$busybox_version" "$busybox_dir"
+    cd "$busybox_dir"
+
+    make distclean
+
+    cp "$configs_dir/rootfs/busybox.config" .config
+    make oldconfig
+
+    make
+    make CONFIG_PREFIX="$build_rootfs_dir" install
 )
 
 _build_initramfs_rootfs() (
     echo "initramfs: creating rootfs..."
 
-    rm -rf "$rootfs_dir"
-    mkdir -p "$rootfs_dir"
+    rm -rf "$build_initramfs_dir" "$build_rootfs_dir"
+    mkdir -p "$build_initramfs_dir" "$build_rootfs_dir"
 
-    cp -a "$initramfs_dir"/* "$rootfs_dir"
+    cp -a "$initramfs_dir"/. "$build_initramfs_dir"
 
     _build_initramfs_busybox
+    _build_rootfs_busybox
 
-    cd "$rootfs_dir"
+    mksquashfs "$build_rootfs_dir" "$build_initramfs_dir/rootfs.squashfs" \
+        -comp zstd
+
+    cd "$build_initramfs_dir"
 
     chmod +x init
     mkdir -p dev proc sbin sys usr/bin usr/sbin
@@ -107,25 +136,25 @@ _build_img() {
     _build_initramfs_rootfs
     echo "creating img..."
 
-    cd "$rootfs_dir"
+    cd "$build_initramfs_dir"
     find . | cpio -ov -H newc > "$pwdr_cpio"
 
-    gzip -9c "$pwdr_cpio" > "$pwdr_img"
+    zstd -6 -T0 -c "$pwdr_cpio" > "$pwdr_img"
 }
 
 _build_iso() {
     _build_img
 
-    rm -rf "$iso_dir"
-    mkdir -p "$iso_dir/boot/grub"
+    rm -rf "$build_iso_dir"
+    mkdir -p "$build_iso_dir/boot/grub"
 
-    cp "$configs_dir/grub.cfg" "$iso_dir/boot/grub"
+    cp "$configs_dir/grub.cfg" "$build_iso_dir/boot/grub"
 
     _build_linux
-    cp "$linux_dir/arch/x86_64/boot/bzImage" "$pwdr_img" "$iso_dir/boot"
+    cp "$linux_dir/arch/x86_64/boot/bzImage" "$pwdr_img" "$build_iso_dir/boot"
 
     echo "creating iso..."
-    grub-mkrescue -o "$pwdr_iso" "$iso_dir"
+    grub-mkrescue -o "$pwdr_iso" "$build_iso_dir"
 }
 
 _build_iso
