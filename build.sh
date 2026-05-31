@@ -2,8 +2,9 @@
 
 set -euo pipefail
 
-linux_version="v7.0"
-busybox_version="1_37_1"
+linux_tag="v7.0"
+busybox_tag="1_37_1"
+neofetch_tag="master"
 
 root="$PWD"
 configs_dir="$root/configs"
@@ -14,8 +15,9 @@ rootfs_dir="$root/rootfs"
 thirdparty_dir="$root/thirdparty"
 build_dir="$root/build"
 
-linux_dir="$thirdparty_dir/linux-$linux_version"
-busybox_dir="$thirdparty_dir/busybox-$busybox_version"
+linux_dir="$thirdparty_dir/linux-$linux_tag"
+busybox_dir="$thirdparty_dir/busybox-$busybox_tag"
+neofetch_dir="$thirdparty_dir/neofetch-$neofetch_tag"
 
 build_initramfs_dir="$build_dir/initramfs"
 build_rootfs_dir="$build_dir/rootfs"
@@ -27,6 +29,7 @@ pwdr_iso="$build_dir/pwdr.iso"
 
 linux_repo="https://github.com/torvalds/linux"
 busybox_repo="https://github.com/pwdrlinux/busybox"
+neofetch_repo="https://github.com/pwdrlinux/neofetch"
 
 mkdir -p "$thirdparty_dir" "$build_dir"
 
@@ -75,7 +78,7 @@ _clone_if_needed() {
 _build_linux() (
     echo "building kernel..."
 
-    _clone_if_needed "$linux_repo" "$linux_version" "$linux_dir"
+    _clone_if_needed "$linux_repo" "$linux_tag" "$linux_dir"
     cd "$linux_dir"
 
     cp "$configs_dir/linux.config" .config
@@ -87,7 +90,7 @@ _build_linux() (
 _build_initramfs_busybox() (
     echo "initramfs: building busybox..."
 
-    _clone_if_needed "$busybox_repo" "$busybox_version" "$busybox_dir"
+    _clone_if_needed "$busybox_repo" "$busybox_tag" "$busybox_dir"
     cd "$busybox_dir"
 
     make distclean
@@ -102,7 +105,7 @@ _build_initramfs_busybox() (
 _build_rootfs_busybox() (
     echo "rootfs: building busybox..."
 
-    _clone_if_needed "$busybox_repo" "$busybox_version" "$busybox_dir"
+    _clone_if_needed "$busybox_repo" "$busybox_tag" "$busybox_dir"
     cd "$busybox_dir"
 
     make distclean
@@ -114,11 +117,22 @@ _build_rootfs_busybox() (
     make CONFIG_PREFIX="$build_rootfs_dir" install
 )
 
+_build_extra_rootfs_software() (
+    echo "rootfs: installing neofetch..."
+
+    _clone_if_needed "$neofetch_repo" "$neofetch_tag" "$neofetch_dir"
+    cd "$neofetch_dir"
+
+    make DESTDIR="$build_rootfs_dir" install
+)
+
 _build_rootfs() (
     rm -rf "$build_rootfs_dir"
     mkdir -p "$build_rootfs_dir"
 
     _build_rootfs_busybox
+    _build_extra_rootfs_software
+
     cd "$build_rootfs_dir"
 
     cp -a "$rootfs_dir"/. .
