@@ -1,0 +1,11 @@
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin"
+
+if ! [ -d /etc/profile.d ]; then
+    exit
+fi
+
+for file in /etc/profile.d/*.sh; do
+    . "$file"
+done
+
+unset file
