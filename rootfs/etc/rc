@@ -6,4 +6,8 @@ mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev
 
+if [ -f /etc/hostname ]; then
+    hostname -F /etc/hostname
+fi
+
 exec runsvdir -P /var/service
