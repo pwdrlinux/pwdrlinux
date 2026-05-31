@@ -4,6 +4,7 @@ set -euo pipefail
 
 linux_tag="v7.0"
 busybox_tag="1_37_1"
+bash_tag="bash-5.3"
 neofetch_tag="master"
 
 root="$PWD"
@@ -17,6 +18,7 @@ build_dir="$root/build"
 
 linux_dir="$thirdparty_dir/linux-$linux_tag"
 busybox_dir="$thirdparty_dir/busybox-$busybox_tag"
+bash_dir="$thirdparty_dir/bash-$bash_tag"
 neofetch_dir="$thirdparty_dir/neofetch-$neofetch_tag"
 
 build_initramfs_dir="$build_dir/initramfs"
@@ -29,6 +31,7 @@ pwdr_iso="$build_dir/pwdr.iso"
 
 linux_repo="https://github.com/torvalds/linux"
 busybox_repo="https://github.com/pwdrlinux/busybox"
+bash_repo="https://git.savannah.gnu.org/git/bash.git"
 neofetch_repo="https://github.com/pwdrlinux/neofetch"
 
 mkdir -p "$thirdparty_dir" "$build_dir"
@@ -118,6 +121,15 @@ _build_rootfs_busybox() (
 )
 
 _build_extra_rootfs_software() (
+    echo "rootfs: building bash..."
+
+    _clone_if_needed "$bash_repo" "$bash_tag" "$bash_dir"
+    cd "$bash_dir"
+
+    ./configure --enable-static-link --prefix="$build_rootfs_dir"
+    make
+    make install
+
     echo "rootfs: installing neofetch..."
 
     _clone_if_needed "$neofetch_repo" "$neofetch_tag" "$neofetch_dir"
