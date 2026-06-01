@@ -65,7 +65,7 @@ _require_cmd() {
     done
 }
 
-_require_cmd git make cc cpio zstd grub-mkrescue mksquashfs
+_require_cmd git make cc cpio zstd grub-mkrescue mksquashfs autoconf
 
 _clone_if_needed() {
     local repo="$1"
